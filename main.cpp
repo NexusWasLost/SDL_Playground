@@ -8,6 +8,9 @@
 void displayRendererInfo(SDL_Renderer* renderer);
 SDL_Texture* stageImage(SDL_Renderer* renderer, const char* filepath);
 void loadImage(SDL_Renderer* renderer, SDL_Texture* texture);
+void destroyWindowAndRenderer(SDL_Window* window, SDL_Renderer* renderer);
+
+float selectFactor(float widthFactor, float heightFactor);
 
 int main(int argc, char** argv){
     if(argc != 2){
@@ -44,7 +47,12 @@ int main(int argc, char** argv){
 
     //stage image before main loop
     SDL_Texture* texture = stageImage(renderer, filepath);
-    if(texture == nullptr) return 1;
+    if(texture == nullptr){
+        SDL_DestroyTexture(texture);
+        destroyWindowAndRenderer(window, renderer);
+        SDL_Quit();
+        return 1;
+    }
 
     bool windowIsRunning = true;
     while(windowIsRunning){
@@ -61,10 +69,7 @@ int main(int argc, char** argv){
     }
 
     SDL_DestroyTexture(texture);
-    //destroy the renderer
-    SDL_DestroyRenderer(renderer);
-    //destroy the window
-    SDL_DestroyWindow(window);
+    destroyWindowAndRenderer(window, renderer);
     SDL_Quit();
 
     return 0;
@@ -86,7 +91,45 @@ void loadImage(SDL_Renderer* renderer, SDL_Texture* texture){
     //clear the previous frame
     SDL_RenderClear(renderer);
 
-    bool success = SDL_RenderTexture(renderer, texture, nullptr, nullptr);
+    float IMAGE_WIDTH = 736.0f;
+    float IMAGE_HEIGHT = 1594.0f;
+    //crop of the actual image (This decides the amount of the actual image content)
+    SDL_FRect src = {0.0f, 0.0f, IMAGE_WIDTH, IMAGE_HEIGHT};
+    /*
+    crop of the bounding box in the main window in which the image will fit !
+    The image will fill this box no matter its crop
+    If the image's src crop is set as 1000px by 1000px it will fill the destination box,
+    no matter the destination box's widht and height
+    */
+
+    /*
+    Calculate the scaling factor
+    */
+    float widthFactor = WINDOW_MAX_WIDTH / IMAGE_WIDTH;
+    float heightFactor = WINDOW_MAX_HEIGHT / IMAGE_HEIGHT;
+    float factor = selectFactor(widthFactor, heightFactor);
+
+    float scaledImageWidth = IMAGE_WIDTH * factor;
+    float scaledImageHeight = IMAGE_HEIGHT * factor;
+
+    //calculate window center
+    float windowWidthCenter = WINDOW_MAX_WIDTH / 2;
+    float windowHeightCenter = WINDOW_MAX_HEIGHT / 2;
+
+    //calculate image starting point
+    /*
+    I would want my image to be centered
+    That means my image's center and window's center would intersect !
+    So if I go half way from the center in X axis I will cover half of the image horizontally and land on the edge of the image
+    Doing so on the Y axis will make me land on the edge of the image vertically
+    therefore moving both horizontally and vertically from the center will gimme the starting of the image !
+    */
+    float imageStartWidth = windowWidthCenter - (scaledImageWidth / 2);
+    float imageStartHeight = windowHeightCenter - (scaledImageHeight / 2);
+
+    SDL_FRect dest = {imageStartWidth, imageStartHeight, scaledImageWidth, scaledImageHeight};
+
+    bool success = SDL_RenderTexture(renderer, texture, &src, &dest);
     if(!success){
         std::cout << "SDL Error failed to render texture: " << SDL_GetError();
         return;
@@ -99,6 +142,13 @@ void loadImage(SDL_Renderer* renderer, SDL_Texture* texture){
     }
 }
 
+float selectFactor(float widthFactor, float heightFactor){
+    if(widthFactor < heightFactor){
+        return widthFactor;
+    }
+    return heightFactor;
+}
+
 void displayRendererInfo(SDL_Renderer* renderer){
     const char* rendererName = SDL_GetRendererName(renderer);
     if(rendererName == nullptr){
@@ -107,4 +157,11 @@ void displayRendererInfo(SDL_Renderer* renderer){
     }
 
     std::cout << rendererName << "\n";
+}
+
+void destroyWindowAndRenderer(SDL_Window* window, SDL_Renderer* renderer){
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+
+    //pass by reference so it destroys the actual objects
 }
