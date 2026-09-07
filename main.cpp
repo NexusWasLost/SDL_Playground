@@ -6,10 +6,16 @@
 #define WINDOW_MAX_HEIGHT 720
 
 void displayRendererInfo(SDL_Renderer* renderer);
-SDL_Texture* stageImage(SDL_Renderer* renderer);
+SDL_Texture* stageImage(SDL_Renderer* renderer, const char* filepath);
 void loadImage(SDL_Renderer* renderer, SDL_Texture* texture);
 
 int main(int argc, char** argv){
+    if(argc != 2){
+        std::cout << "Invalid number of parameters" << "\n";
+        return 1;
+    }
+    const char* filepath = argv[1];
+
     if(SDL_Init(SDL_INIT_VIDEO) < 0){
         std::cout << "SDL could not be initialized: " << SDL_GetError();
         return 1;
@@ -37,7 +43,7 @@ int main(int argc, char** argv){
     displayRendererInfo(renderer);
 
     //stage image before main loop
-    SDL_Texture* texture = stageImage(renderer);
+    SDL_Texture* texture = stageImage(renderer, filepath);
     if(texture == nullptr) return 1;
 
     bool windowIsRunning = true;
@@ -64,11 +70,11 @@ int main(int argc, char** argv){
     return 0;
 }
 
-SDL_Texture* stageImage(SDL_Renderer* renderer){
+SDL_Texture* stageImage(SDL_Renderer* renderer, const char* filepath){
     // SDL_Surface* image = nullptr;
     SDL_Texture* texture = nullptr;
 
-    texture = IMG_LoadTexture(renderer, "jpgtestsubject.jpg");
+    texture = IMG_LoadTexture(renderer, filepath);
     if(!texture){
         std::cout << "SDL Error creating texture: " << SDL_GetError();
         return nullptr;
