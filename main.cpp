@@ -4,14 +4,18 @@
 #define WINDOW_MAX_WIDTH 640
 #define WINDOW_MAX_HEIGHT 480
 
-void loadImage(SDL_Renderer* renderer);
 void displayRendererInfo(SDL_Renderer* renderer);
+SDL_Texture* stageImage(SDL_Renderer* renderer);
+void loadImage(SDL_Renderer* renderer, SDL_Texture* texture);
 
 int main(int argc, char** argv){
-    if(SDL_Init(SDL_INIT_VIDEO) < 0)
+    if(SDL_Init(SDL_INIT_VIDEO) < 0){
         std::cout << "SDL could not be initialized: " << SDL_GetError();
-    else
+        return 1;
+    }
+    else{
         std::cout << "SDL Video System Ready to go\n";
+    }
 
     SDL_Window* window = nullptr;
     window = SDL_CreateWindow(
@@ -20,12 +24,20 @@ int main(int argc, char** argv){
         WINDOW_MAX_HEIGHT,
         0
     );
+    if(!window){
+        std::cout << "Failed to init window: " << SDL_GetError();
+        return -1;
+    }
 
     //create the renderer
     SDL_Renderer* renderer = nullptr;
     renderer = SDL_CreateRenderer(window, nullptr);
     //print Renderer Name
     displayRendererInfo(renderer);
+
+    //stage image before main loop
+    SDL_Texture* texture = stageImage(renderer);
+    if(texture == nullptr) return 1;
 
     bool windowIsRunning = true;
     while(windowIsRunning){
@@ -38,10 +50,10 @@ int main(int argc, char** argv){
             }
         }
 
-        loadImage(renderer);
-        SDL_Delay(2000);
+        loadImage(renderer, texture);
     }
 
+    SDL_DestroyTexture(texture);
     //destroy the renderer
     SDL_DestroyRenderer(renderer);
     //destroy the window
@@ -51,47 +63,42 @@ int main(int argc, char** argv){
     return 0;
 }
 
-void loadImage(SDL_Renderer* renderer){
-    //clear the previous frame
-    SDL_RenderClear(renderer);
-
-    //create surface to hold pixels
+SDL_Texture* stageImage(SDL_Renderer* renderer){
     SDL_Surface* image = nullptr;
-    std::cout << "Trying to load Image !\n";
+    SDL_Texture* texture = nullptr;
+
     image = SDL_LoadBMP("example.bmp");
     if(image == nullptr){
         std::cout << "SDL Error creating Surface: " << SDL_GetError();
-        SDL_DestroySurface(image);
-        return;
+        return nullptr;
     }
 
-    SDL_Texture* texture = nullptr;
     texture = SDL_CreateTextureFromSurface(renderer, image);
     if(texture == nullptr){
         std::cout << "SDL Error creating texture: " << SDL_GetError();
         SDL_DestroySurface(image);
-        SDL_DestroyTexture(texture);
-        return;
+        return nullptr;
     }
+
+    SDL_DestroySurface(image);
+    return texture;
+}
+
+void loadImage(SDL_Renderer* renderer, SDL_Texture* texture){
+    //clear the previous frame
+    SDL_RenderClear(renderer);
 
     bool success = SDL_RenderTexture(renderer, texture, nullptr, nullptr);
     if(!success){
         std::cout << "SDL Error failed to render texture: " << SDL_GetError();
-        SDL_DestroySurface(image);
-        SDL_DestroyTexture(texture);
         return;
     }
 
     bool success2 = SDL_RenderPresent(renderer);
     if(!success2){
         std::cout << "SDL Error failed to render frame: " << SDL_GetError();
-        SDL_DestroySurface(image);
-        SDL_DestroyTexture(texture);
         return;
     }
-
-    SDL_DestroySurface(image);
-    SDL_DestroyTexture(texture);
 }
 
 void displayRendererInfo(SDL_Renderer* renderer){
