@@ -1,8 +1,9 @@
 #include <iostream>
 #include <SDL3/SDL.h>
+#include <SDL3_image/SDL_image.h>
 
-#define WINDOW_MAX_WIDTH 640
-#define WINDOW_MAX_HEIGHT 480
+#define WINDOW_MAX_WIDTH 1280
+#define WINDOW_MAX_HEIGHT 720
 
 void displayRendererInfo(SDL_Renderer* renderer);
 SDL_Texture* stageImage(SDL_Renderer* renderer);
@@ -64,23 +65,14 @@ int main(int argc, char** argv){
 }
 
 SDL_Texture* stageImage(SDL_Renderer* renderer){
-    SDL_Surface* image = nullptr;
+    // SDL_Surface* image = nullptr;
     SDL_Texture* texture = nullptr;
 
-    image = SDL_LoadBMP("example.bmp");
-    if(image == nullptr){
-        std::cout << "SDL Error creating Surface: " << SDL_GetError();
-        return nullptr;
-    }
-
-    texture = SDL_CreateTextureFromSurface(renderer, image);
-    if(texture == nullptr){
+    texture = IMG_LoadTexture(renderer, "jpgtestsubject.jpg");
+    if(!texture){
         std::cout << "SDL Error creating texture: " << SDL_GetError();
-        SDL_DestroySurface(image);
         return nullptr;
     }
-
-    SDL_DestroySurface(image);
     return texture;
 }
 
