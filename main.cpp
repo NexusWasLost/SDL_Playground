@@ -7,7 +7,7 @@
 
 void displayRendererInfo(SDL_Renderer* renderer);
 SDL_Texture* stageImage(SDL_Renderer* renderer, const char* filepath);
-void loadImage(SDL_Renderer* renderer, SDL_Texture* texture);
+void loadImage(SDL_Renderer* renderer, SDL_Texture* texture, float width, float height);
 void destroyWindowAndRenderer(SDL_Window* window, SDL_Renderer* renderer);
 
 float selectFactor(float widthFactor, float heightFactor);
@@ -53,6 +53,15 @@ int main(int argc, char** argv){
         SDL_Quit();
         return 1;
     }
+    //get texture width and height
+    float width = 0.0f; float height = 0.0f;
+    bool textureInfoSuccess = SDL_GetTextureSize(texture, &width, &height);
+    if(!textureInfoSuccess){
+        SDL_DestroyTexture(texture);
+        destroyWindowAndRenderer(window, renderer);
+        SDL_Quit();
+        return 1;
+    }
 
     bool windowIsRunning = true;
     while(windowIsRunning){
@@ -65,7 +74,7 @@ int main(int argc, char** argv){
             }
         }
 
-        loadImage(renderer, texture);
+        loadImage(renderer, texture, width, height);
     }
 
     SDL_DestroyTexture(texture);
@@ -87,14 +96,14 @@ SDL_Texture* stageImage(SDL_Renderer* renderer, const char* filepath){
     return texture;
 }
 
-void loadImage(SDL_Renderer* renderer, SDL_Texture* texture){
+void loadImage(SDL_Renderer* renderer, SDL_Texture* texture, float width, float height){
     //clear the previous frame
     SDL_RenderClear(renderer);
 
-    float IMAGE_WIDTH = 736.0f;
-    float IMAGE_HEIGHT = 1594.0f;
+    // float IMAGE_WIDTH = 736.0f;
+    // float IMAGE_HEIGHT = 1594.0f;
     //crop of the actual image (This decides the amount of the actual image content)
-    SDL_FRect src = {0.0f, 0.0f, IMAGE_WIDTH, IMAGE_HEIGHT};
+    SDL_FRect src = {0.0f, 0.0f, width, height};
     /*
     crop of the bounding box in the main window in which the image will fit !
     The image will fill this box no matter its crop
@@ -105,12 +114,12 @@ void loadImage(SDL_Renderer* renderer, SDL_Texture* texture){
     /*
     Calculate the scaling factor
     */
-    float widthFactor = WINDOW_MAX_WIDTH / IMAGE_WIDTH;
-    float heightFactor = WINDOW_MAX_HEIGHT / IMAGE_HEIGHT;
+    float widthFactor = WINDOW_MAX_WIDTH / width;
+    float heightFactor = WINDOW_MAX_HEIGHT / height;
     float factor = selectFactor(widthFactor, heightFactor);
 
-    float scaledImageWidth = IMAGE_WIDTH * factor;
-    float scaledImageHeight = IMAGE_HEIGHT * factor;
+    float scaledImageWidth = width * factor;
+    float scaledImageHeight = height * factor;
 
     //calculate window center
     float windowWidthCenter = WINDOW_MAX_WIDTH / 2;
