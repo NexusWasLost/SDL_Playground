@@ -5,6 +5,8 @@
 #define WINDOW_DEFAULT_WIDTH 1280
 #define WINDOW_DEFAULT_HEIGHT 720
 
+const Uint64 TARGET_FRAMETIME_MS = 1000/5;
+
 struct imageTexture{
     SDL_Texture* texture;
     float width;
@@ -65,6 +67,7 @@ int main(int argc, char** argv){
     bool windowIsRunning = true;
     while(windowIsRunning){
         SDL_Event event;
+        Uint64 startTicks = SDL_GetTicks();
 
         while(SDL_PollEvent(&event)){
             if(event.type == SDL_EVENT_QUIT){
@@ -74,6 +77,10 @@ int main(int argc, char** argv){
         }
 
         renderImage(window, renderer, img.texture, img.width, img.height);
+        const Uint64 frametime = SDL_GetTicks() - startTicks;
+        if(frametime < TARGET_FRAMETIME_MS){
+            SDL_Delay(TARGET_FRAMETIME_MS - frametime);
+        }
     }
 
     SDL_DestroyTexture(img.texture);
