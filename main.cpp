@@ -2,8 +2,8 @@
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
 
-#define WINDOW_MAX_WIDTH 1280
-#define WINDOW_MAX_HEIGHT 720
+#define WINDOW_DEFAULT_WIDTH 1280
+#define WINDOW_DEFAULT_HEIGHT 720
 
 struct imageTexture{
     SDL_Texture* texture;
@@ -12,10 +12,9 @@ struct imageTexture{
 };
 
 void displayRendererInfo(SDL_Renderer* renderer);
-void renderImage(SDL_Renderer* renderer, SDL_Texture* texture, float width, float height);
+void renderImage(SDL_Window* window, SDL_Renderer* renderer, SDL_Texture* texture, float width, float height);
 void destroyWindowAndRenderer(SDL_Window* window, SDL_Renderer* renderer);
 imageTexture* stageImage(SDL_Renderer* renderer, const char* filepath, imageTexture* img);
-
 float selectFactor(float widthFactor, float heightFactor);
 
 int main(int argc, char** argv){
@@ -33,23 +32,24 @@ int main(int argc, char** argv){
         std::cout << "SDL Video System Ready to go\n";
     }
 
-    SDL_Window* window = nullptr;
-    window = SDL_CreateWindow(
+    SDL_Window* window = SDL_CreateWindow(
         "PhotoViewer",
-        WINDOW_MAX_WIDTH,
-        WINDOW_MAX_HEIGHT,
-        0
+        WINDOW_DEFAULT_WIDTH,
+        WINDOW_DEFAULT_HEIGHT,
+        SDL_WINDOW_RESIZABLE
     );
     if(!window){
         std::cout << "Failed to init window: " << SDL_GetError();
-        return -1;
+        return 1;
     }
 
     //create the renderer
-    SDL_Renderer* renderer = nullptr;
-    renderer = SDL_CreateRenderer(window, nullptr);
-    if(renderer == nullptr)
-        destroyWindowAndRenderer(window, renderer);
+    SDL_Renderer*  renderer = SDL_CreateRenderer(window, nullptr);
+    if(renderer == nullptr){
+        std::cout << "Failed to create renderer: " << SDL_GetError();
+        SDL_DestroyWindow(window);
+        return 1;
+    }
     //print Renderer Name
     displayRendererInfo(renderer);
 
@@ -58,6 +58,7 @@ int main(int argc, char** argv){
     if(stageImage(renderer, filepath, &img) == nullptr){
         destroyWindowAndRenderer(window, renderer);
         SDL_Quit();
+        return 1;
     }
 
     bool windowIsRunning = true;
@@ -71,7 +72,7 @@ int main(int argc, char** argv){
             }
         }
 
-        renderImage(renderer, img.texture, img.width, img.height);
+        renderImage(window, renderer, img.texture, img.width, img.height);
     }
 
     SDL_DestroyTexture(img.texture);
@@ -102,24 +103,28 @@ imageTexture* stageImage(SDL_Renderer* renderer, const char* filepath, imageText
     return img;
 }
 
-void renderImage(SDL_Renderer* renderer, SDL_Texture* texture, float width, float height){
+void renderImage(SDL_Window* window, SDL_Renderer* renderer, SDL_Texture* texture, float width, float height){
     //clear the previous frame
     SDL_RenderClear(renderer);
+
+    //get current window for each frame
+    int windowWidth, windowHeight;
+    if(!SDL_GetWindowSize(window, &windowWidth, &windowHeight)) return;
 
     //crop of the actual image (This decides the amount of the actual image content)
     SDL_FRect src = {0.0f, 0.0f, width, height};
 
     /*    Calculate the scaling factor    */
-    float widthFactor = WINDOW_MAX_WIDTH / width;
-    float heightFactor = WINDOW_MAX_HEIGHT / height;
+    float widthFactor = windowWidth / width;
+    float heightFactor = windowHeight / height;
     float factor = selectFactor(widthFactor, heightFactor);
 
     float scaledImageWidth = width * factor;
     float scaledImageHeight = height * factor;
 
     //calculate window center
-    float windowWidthCenter = WINDOW_MAX_WIDTH / 2;
-    float windowHeightCenter = WINDOW_MAX_HEIGHT / 2;
+    float windowWidthCenter = windowWidth / 2;
+    float windowHeightCenter = windowHeight / 2;
 
     //calculate image starting point
     /*
@@ -165,6 +170,5 @@ void displayRendererInfo(SDL_Renderer* renderer){
 void destroyWindowAndRenderer(SDL_Window* window, SDL_Renderer* renderer){
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
-
     //pass by reference so it destroys the actual objects
 }
