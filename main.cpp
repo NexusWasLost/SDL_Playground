@@ -14,7 +14,6 @@ struct imageTexture{
 void displayRendererInfo(SDL_Renderer* renderer);
 void renderImage(SDL_Window* window, SDL_Renderer* renderer, SDL_Texture* texture, float width, float height);
 void destroyWindowAndRenderer(SDL_Window* window, SDL_Renderer* renderer);
-imageTexture* stageImage(SDL_Renderer* renderer, const char* filepath, imageTexture* img);
 float selectFactor(float widthFactor, float heightFactor);
 
 int main(int argc, char** argv){
@@ -54,8 +53,10 @@ int main(int argc, char** argv){
     displayRendererInfo(renderer);
 
     //stage the image
-    imageTexture img;
-    if(stageImage(renderer, filepath, &img) == nullptr){
+    imageTexture img = { IMG_LoadTexture(renderer, argv[1]), 0.0f, 0.0f };
+    if(!img.texture || !SDL_GetTextureSize(img.texture, &img.width, &img.height)){
+        std::cout << "Failed to create texture and get texture size: " << SDL_GetError();
+        if(img.texture) SDL_DestroyTexture(img.texture);
         destroyWindowAndRenderer(window, renderer);
         SDL_Quit();
         return 1;
@@ -80,27 +81,6 @@ int main(int argc, char** argv){
     SDL_Quit();
 
     return 0;
-}
-
-imageTexture* stageImage(SDL_Renderer* renderer, const char* filepath, imageTexture* img){
-    if(!img) return nullptr;
-
-    //create a texture
-    img->texture = IMG_LoadTexture(renderer, filepath);
-    if(img->texture == nullptr){
-        std::cout << "SDL Error creating texture: " << SDL_GetError();
-        return nullptr;
-    }
-
-    //fetch texture info
-    bool textureInfoSuccess = SDL_GetTextureSize(img->texture, &img->width, &img->height);
-    if(!textureInfoSuccess){
-        std::cout << "Failed to get Texture info: " << SDL_GetError();
-        SDL_DestroyTexture(img->texture);
-        return nullptr;
-    }
-
-    return img;
 }
 
 void renderImage(SDL_Window* window, SDL_Renderer* renderer, SDL_Texture* texture, float width, float height){
