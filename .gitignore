@@ -1,8 +1,7 @@
 SDL3
 SDL3_image
 MPV
-SDL3.dll
-SDL3_image.dll
+*.dll
 *.exe
 *.bmp
 *.png
@@ -10,3 +9,4 @@ SDL3_image.dll
 *.jpeg
 *.svg
 *.webp
+*.mp4
