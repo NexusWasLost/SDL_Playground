@@ -8,11 +8,11 @@
 const Uint64 TARGET_FRAMETIME_MS = 1000/5;
 
 int main(int argc, char** argv){
-    // if(argc != 2){
-    //     std::cout << "Invalid number of parameters" << "\n";
-    //     return 1;
-    // }
-    // const char* filepath = argv[1];
+    if(argc != 2){
+        std::cout << "Invalid number of parameters" << "\n";
+        return 1;
+    }
+    const char* filepath = argv[1];
 
     if(SDL_Init(SDL_INIT_VIDEO) < 0){
         std::cout << "SDL could not be initialized: " << SDL_GetError();
@@ -70,7 +70,7 @@ int main(int argc, char** argv){
 
     const char* cmd[] = {
         "loadfile",
-        "./EP.1.v0.1729392308.1080p.mp4",
+        filepath,
         nullptr
     };
     int cmd_success = mpv_command(mpv, cmd);
