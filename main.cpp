@@ -7,14 +7,65 @@
 
 const Uint64 TARGET_FRAMETIME_MS = 1000/5;
 
-struct imageTexture{
-    SDL_Texture* texture;
-    float width;
-    float height;
+class renderContext{
+    public:
+    SDL_Window* window = nullptr;
+    SDL_Renderer* renderer = nullptr;
+    SDL_Texture* texture = nullptr;
+    float textureWidth = 0.0f;
+    float textureHeight = 0.0f;
+
+    renderContext(){
+        //create window
+        this->window = SDL_CreateWindow(
+            "PhotoViewer",
+            WINDOW_DEFAULT_WIDTH,
+            WINDOW_DEFAULT_HEIGHT,
+            SDL_WINDOW_RESIZABLE
+        );
+        if(!this->window) return;
+
+        //create rendering context
+        this->renderer = SDL_CreateRenderer(this->window, nullptr);
+        if(!this->renderer){
+            SDL_DestroyWindow(this->window);
+            this->window = nullptr;
+            //renderer remains nullptr
+        }
+    }
+
+    ~renderContext(){
+        if(this->renderer != nullptr){
+            SDL_DestroyRenderer(this->renderer);
+            this->renderer = nullptr;
+        }
+        if(this->window != nullptr){
+            SDL_DestroyWindow(this->window);
+            this->window = nullptr;
+        }
+        if(this->texture != nullptr){
+            SDL_DestroyTexture(texture);
+            this->texture = nullptr;
+        }
+    }
+
+    bool createTexture(const char* filepath){
+        //0 means failure and 1 means success
+        if(!renderer || !window) return 0;
+        texture = IMG_LoadTexture(renderer, filepath);
+        if(!texture || !SDL_GetTextureSize(texture, &textureWidth, &textureHeight)){
+            if(texture) SDL_DestroyTexture(texture);
+            textureWidth = 0.0f, textureHeight = 0.0f;
+            return 0;
+        }
+
+        return 1;
+    }
+
 };
 
 void displayRendererInfo(SDL_Renderer* renderer);
-void renderImage(SDL_Window* window, SDL_Renderer* renderer, SDL_Texture* texture, float width, float height);
+void renderImage(renderContext& rdc);
 void destroyWindowAndRenderer(SDL_Window* window, SDL_Renderer* renderer);
 float selectFactor(float widthFactor, float heightFactor);
 
@@ -33,33 +84,18 @@ int main(int argc, char** argv){
         std::cout << "SDL Video System Ready to go\n";
     }
 
-    SDL_Window* window = SDL_CreateWindow(
-        "PhotoViewer",
-        WINDOW_DEFAULT_WIDTH,
-        WINDOW_DEFAULT_HEIGHT,
-        SDL_WINDOW_RESIZABLE
-    );
-    if(!window){
-        std::cout << "Failed to init window: " << SDL_GetError();
+    renderContext* rdc = new renderContext();
+    if(rdc->window == nullptr || rdc->renderer == nullptr){
+        std::cout << "Failed to init window or failed to create renderer: " << SDL_GetError();
+        delete rdc;
+        SDL_Quit();
         return 1;
     }
 
-    //create the renderer
-    SDL_Renderer*  renderer = SDL_CreateRenderer(window, nullptr);
-    if(renderer == nullptr){
-        std::cout << "Failed to create renderer: " << SDL_GetError();
-        SDL_DestroyWindow(window);
-        return 1;
-    }
-    //print Renderer Name
-    displayRendererInfo(renderer);
-
-    //stage the image
-    imageTexture img = { IMG_LoadTexture(renderer, argv[1]), 0.0f, 0.0f };
-    if(!img.texture || !SDL_GetTextureSize(img.texture, &img.width, &img.height)){
+    const bool textureSuccess = rdc->createTexture(argv[1]);
+    if(!textureSuccess){
         std::cout << "Failed to create texture and get texture size: " << SDL_GetError();
-        if(img.texture) SDL_DestroyTexture(img.texture);
-        destroyWindowAndRenderer(window, renderer);
+        delete rdc;
         SDL_Quit();
         return 1;
     }
@@ -76,38 +112,37 @@ int main(int argc, char** argv){
             }
         }
 
-        renderImage(window, renderer, img.texture, img.width, img.height);
+        renderImage(*rdc);
         const Uint64 frametime = SDL_GetTicks() - startTicks;
         if(frametime < TARGET_FRAMETIME_MS){
             SDL_Delay(TARGET_FRAMETIME_MS - frametime);
         }
     }
 
-    SDL_DestroyTexture(img.texture);
-    destroyWindowAndRenderer(window, renderer);
+    delete rdc;
     SDL_Quit();
 
     return 0;
 }
 
-void renderImage(SDL_Window* window, SDL_Renderer* renderer, SDL_Texture* texture, float width, float height){
+void renderImage(renderContext& rdc){
     //clear the previous frame
-    SDL_RenderClear(renderer);
+    SDL_RenderClear(rdc.renderer);
 
     //get current window for each frame
     int windowWidth, windowHeight;
-    if(!SDL_GetWindowSize(window, &windowWidth, &windowHeight)) return;
+    if(!SDL_GetWindowSize(rdc.window, &windowWidth, &windowHeight)) return;
 
     //crop of the actual image (This decides the amount of the actual image content)
-    SDL_FRect src = {0.0f, 0.0f, width, height};
+    SDL_FRect src = {0.0f, 0.0f, rdc.textureWidth, rdc.textureHeight};
 
     /*    Calculate the scaling factor    */
-    float widthFactor = windowWidth / width;
-    float heightFactor = windowHeight / height;
+    float widthFactor = windowWidth / rdc.textureWidth;
+    float heightFactor = windowHeight / rdc.textureHeight;
     float factor = selectFactor(widthFactor, heightFactor);
 
-    float scaledImageWidth = width * factor;
-    float scaledImageHeight = height * factor;
+    float scaledImageWidth = rdc.textureWidth * factor;
+    float scaledImageHeight = rdc.textureHeight * factor;
 
     //calculate window center
     float windowWidthCenter = windowWidth / 2;
@@ -124,13 +159,13 @@ void renderImage(SDL_Window* window, SDL_Renderer* renderer, SDL_Texture* textur
 
     SDL_FRect dest = {imageStartWidth, imageStartHeight, scaledImageWidth, scaledImageHeight};
 
-    bool success = SDL_RenderTexture(renderer, texture, &src, &dest);
+    bool success = SDL_RenderTexture(rdc.renderer, rdc.texture, &src, &dest);
     if(!success){
         std::cout << "SDL Error failed to render texture: " << SDL_GetError();
         return;
     }
 
-    bool success2 = SDL_RenderPresent(renderer);
+    bool success2 = SDL_RenderPresent(rdc.renderer);
     if(!success2){
         std::cout << "SDL Error failed to render frame: " << SDL_GetError();
         return;
