@@ -1,7 +1,7 @@
 #include <iostream>
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
-#include <mutex>
+#include <atomic>
 
 #define WINDOW_DEFAULT_WIDTH 1280
 #define WINDOW_DEFAULT_HEIGHT 720
@@ -15,7 +15,7 @@ class renderContext{
     SDL_Texture* texture = nullptr;
     float textureWidth = 0.0f;
     float textureHeight = 0.0f;
-    std::mutex renderLock; //used to prevent double render at the same time
+    std::atomic<bool> isRendering{false};
 
     renderContext(){
         //create window
@@ -37,6 +37,10 @@ class renderContext{
     }
 
     ~renderContext(){
+        if(this->texture != nullptr){
+            SDL_DestroyTexture(texture);
+            this->texture = nullptr;
+        }
         if(this->renderer != nullptr){
             SDL_DestroyRenderer(this->renderer);
             this->renderer = nullptr;
@@ -45,15 +49,10 @@ class renderContext{
             SDL_DestroyWindow(this->window);
             this->window = nullptr;
         }
-        if(this->texture != nullptr){
-            SDL_DestroyTexture(texture);
-            this->texture = nullptr;
-        }
     }
 
     bool createTexture(const char* filepath){
-        //0 means failure and 1 means success
-        if(!renderer || !window) return 0;
+        if(!renderer || !window) return false;
         texture = IMG_LoadTexture(renderer, filepath);
         if(!texture || !SDL_GetTextureSize(texture, &textureWidth, &textureHeight)){
             if(texture){
@@ -61,10 +60,10 @@ class renderContext{
                 texture = nullptr;
             }
             textureWidth = 0.0f, textureHeight = 0.0f;
-            return 0;
+            return false;
         }
 
-        return 1;
+        return true;
     }
 
 };
@@ -77,14 +76,16 @@ float selectFactor(float widthFactor, float heightFactor);
 //callback
 bool liveResize(void* userdata, SDL_Event* event){
     renderContext* r = static_cast<renderContext*>(userdata);
+    bool expectedIsRendering = false;
 
-    r->renderLock.lock();
     if(event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED){
-        renderImage(*r);
+        if(r->isRendering.compare_exchange_strong(expectedIsRendering, true)){
+            renderImage(*r);
+            r->isRendering.store(false);
+        }
     }
-    r->renderLock.unlock();
 
-    return 1;
+    return true;
 }
 
 int main(int argc, char** argv){
@@ -128,6 +129,7 @@ int main(int argc, char** argv){
     while(windowIsRunning){
         SDL_Event event;
         Uint64 startTicks = SDL_GetTicks();
+        bool expectedIsRendering = false;
 
         while(SDL_PollEvent(&event)){
             if(event.type == SDL_EVENT_QUIT){
@@ -136,9 +138,10 @@ int main(int argc, char** argv){
             }
         }
 
-        rdc->renderLock.lock();
-        renderImage(*rdc);
-        rdc->renderLock.unlock();
+        if(rdc->isRendering.compare_exchange_strong(expectedIsRendering, true)){
+            renderImage(*rdc);
+            rdc->isRendering.store(false);
+        }
 
         const Uint64 frametime = SDL_GetTicks() - startTicks;
         if(frametime < TARGET_FRAMETIME_MS){
@@ -154,6 +157,7 @@ int main(int argc, char** argv){
 
 void renderImage(renderContext& rdc){
     //clear the previous frame
+    SDL_SetRenderDrawColor(rdc.renderer, 0, 0, 0, 255);
     SDL_RenderClear(rdc.renderer);
 
     //get current window for each frame
