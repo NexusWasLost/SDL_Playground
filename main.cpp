@@ -1,6 +1,7 @@
 #include <iostream>
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
+#include <mutex>
 
 #define WINDOW_DEFAULT_WIDTH 1280
 #define WINDOW_DEFAULT_HEIGHT 720
@@ -14,6 +15,7 @@ class renderContext{
     SDL_Texture* texture = nullptr;
     float textureWidth = 0.0f;
     float textureHeight = 0.0f;
+    std::mutex renderLock; //used to prevent double render at the same time
 
     renderContext(){
         //create window
@@ -54,7 +56,10 @@ class renderContext{
         if(!renderer || !window) return 0;
         texture = IMG_LoadTexture(renderer, filepath);
         if(!texture || !SDL_GetTextureSize(texture, &textureWidth, &textureHeight)){
-            if(texture) SDL_DestroyTexture(texture);
+            if(texture){
+                SDL_DestroyTexture(texture);
+                texture = nullptr;
+            }
             textureWidth = 0.0f, textureHeight = 0.0f;
             return 0;
         }
@@ -68,6 +73,19 @@ void displayRendererInfo(SDL_Renderer* renderer);
 void renderImage(renderContext& rdc);
 void destroyWindowAndRenderer(SDL_Window* window, SDL_Renderer* renderer);
 float selectFactor(float widthFactor, float heightFactor);
+
+//callback
+bool liveResize(void* userdata, SDL_Event* event){
+    renderContext* r = static_cast<renderContext*>(userdata);
+
+    r->renderLock.lock();
+    if(event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED){
+        renderImage(*r);
+    }
+    r->renderLock.unlock();
+
+    return 1;
+}
 
 int main(int argc, char** argv){
     if(argc != 2){
@@ -100,6 +118,12 @@ int main(int argc, char** argv){
         return 1;
     }
 
+    //add event watcher for live resize
+    const bool liveResizeWatcherSuccess = SDL_AddEventWatch(liveResize, rdc);
+    if(!liveResizeWatcherSuccess){
+        std::cout << "Failed to add Event Watcher for live resize; Will fallback to simple resize";
+    }
+
     bool windowIsRunning = true;
     while(windowIsRunning){
         SDL_Event event;
@@ -112,7 +136,10 @@ int main(int argc, char** argv){
             }
         }
 
+        rdc->renderLock.lock();
         renderImage(*rdc);
+        rdc->renderLock.unlock();
+
         const Uint64 frametime = SDL_GetTicks() - startTicks;
         if(frametime < TARGET_FRAMETIME_MS){
             SDL_Delay(TARGET_FRAMETIME_MS - frametime);
